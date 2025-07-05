@@ -1,7 +1,7 @@
---[[ 
+--[[
     @author Yakoney
-    @description Grow a Garden auto-farm script (Mobile Friendly)
-    @ui VisibilityUI by Yakoney
+    @description Grow a Garden auto-farm script
+    @ui VisibilityUI
     https://www.roblox.com/games/126884695634066
 ]]
 
@@ -18,118 +18,150 @@ local Backpack = LocalPlayer:WaitForChild("Backpack")
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local ShecklesCount = Leaderstats:WaitForChild("Sheckles")
+local GameInfo = MarketplaceService:GetProductInfo(game.PlaceId)
 
--- UI Library: ReGui with Prefabs
+--// ReGui
 local ReGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/depthso/Dear-ReGui/refs/heads/main/ReGui.lua'))()
 local PrefabsId = "rbxassetid://" .. ReGui.PrefabsId
 
--- Colors for UI Theme
+--// Folders
+local GameEvents = ReplicatedStorage:WaitForChild("GameEvents")
+local Farms = workspace:WaitForChild("Farm")
+
 local Accent = {
     DarkGreen = Color3.fromRGB(45, 95, 25),
     Green = Color3.fromRGB(69, 142, 40),
     Brown = Color3.fromRGB(26, 20, 8),
 }
 
--- Initialize ReGui with Prefabs
+--// ReGui configuration (Ui library)
 ReGui:Init({
-    Prefabs = InsertService:LoadLocalAsset(PrefabsId)
+	Prefabs = InsertService:LoadLocalAsset(PrefabsId)
 })
-
--- Define Mobile-Friendly Theme
-ReGui:DefineTheme("MobileUI", {
-    WindowBg = Accent.Brown,
-    TitleBarBg = Accent.DarkGreen,
-    TitleBarBgActive = Accent.Green,
+ReGui:DefineTheme("VisibilityUI", {
+	WindowBg = Accent.Brown,
+	TitleBarBg = Accent.DarkGreen,
+	TitleBarBgActive = Accent.Green,
     ResizeGrab = Accent.DarkGreen,
     FrameBg = Accent.DarkGreen,
     FrameBgActive = Accent.Green,
-    CollapsingHeaderBg = Accent.Green,
+	CollapsingHeaderBg = Accent.Green,
     ButtonsBg = Accent.Green,
     CheckMark = Accent.Green,
     SliderGrab = Accent.Green,
 })
 
--- Globals for toggles
-local AutoPlant = false
-local AutoHarvest = false
-local AutoSell = false
+--// Dicts
+local SeedStock = {}
+local OwnedSeeds = {}
+local HarvestIgnores = {
+	Normal = false,
+	Gold = false,
+	Rainbow = false
+}
 
--- Placeholder for your farming logic functions
-local function AutoPlantLogic()
-    -- Your original AutoPlant logic goes here
+--// Globals
+local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, AutoSell, SellThreshold, NoClip, AutoWalkAllowRandom, AutoWalk, AutoWalkStatus, AutoWalkMaxWait, SelectedSeedStock
+
+--// Functions for clearing and collecting
+local function ClearTable(t)
+	for k in pairs(t) do t[k] = nil end
 end
 
-local function AutoHarvestLogic()
-    -- Your original AutoHarvest logic goes here
+local function CollectSeedsFromParent(Parent, Seeds)
+	for _, Tool in ipairs(Parent:GetChildren()) do
+		local NameVal = Tool:FindFirstChild("Plant_Name")
+		local CountVal = Tool:FindFirstChild("Numbers")
+		if NameVal and CountVal then
+			Seeds[NameVal.Value] = {
+				Count = CountVal.Value,
+				Tool = Tool
+			}
+		end
+	end
 end
 
-local function AutoSellLogic()
-    -- Your original AutoSell logic goes here
+local function CollectCropsFromParent(Parent, Crops)
+	for _, Tool in ipairs(Parent:GetChildren()) do
+		if Tool:FindFirstChild("Item_String") then
+			table.insert(Crops, Tool)
+		end
+	end
 end
 
--- Create the mobile-friendly UI window
-local function CreateMobileWindow()
-    local Window = ReGui:Window({
-        Title = "VisibilityUI by Yakoney",
-        Theme = "MobileUI",
-        Size = UDim2.new(0.9, 0, 0.7, 0), -- 90% width, 70% height of screen
-        Position = UDim2.new(0.05, 0, 0.15, 0), -- centered with margin
-        Resizable = false,
-        Movable = true,
-    })
-    return Window
+--// Fix GetOwnedSeeds and SeedStock clearing
+local function GetOwnedSeeds()
+	ClearTable(OwnedSeeds)
+	local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	CollectSeedsFromParent(Backpack, OwnedSeeds)
+	CollectSeedsFromParent(Character, OwnedSeeds)
+	return OwnedSeeds
 end
 
-local Window = CreateMobileWindow()
+local function GetSeedStock(IgnoreNoStock)
+	ClearTable(SeedStock)
+	local SeedShop = PlayerGui:WaitForChild("Seed_Shop")
+	local Items = SeedShop:FindFirstChild("Blueberry", true).Parent
+	local NewList = {}
 
--- Add toggle buttons with large touch-friendly size
-local AutoPlantToggle = Window:Toggle({
-    Text = "Auto Plant",
-    Default = false,
-    Callback = function(state)
-        AutoPlant = state
-    end,
-    Size = UDim2.new(1, 0, 0, 50), -- full width, 50px height
-})
+	for _, Item in ipairs(Items:GetChildren()) do
+		local MainFrame = Item:FindFirstChild("Main_Frame")
+		if not MainFrame then continue end
 
-local AutoHarvestToggle = Window:Toggle({
-    Text = "Auto Harvest",
-    Default = false,
-    Callback = function(state)
-        AutoHarvest = state
-    end,
-    Size = UDim2.new(1, 0, 0, 50),
-})
+		local StockText = MainFrame.Stock_Text.Text
+		local StockCount = tonumber(StockText:match("%d+")) or 0
+		SeedStock[Item.Name] = StockCount
+		if IgnoreNoStock and StockCount > 0 then
+			NewList[Item.Name] = StockCount
+		end
+	end
 
-local AutoSellToggle = Window:Toggle({
-    Text = "Auto Sell",
-    Default = false,
-    Callback = function(state)
-        AutoSell = state
-    end,
-    Size = UDim2.new(1, 0, 0, 50),
-})
+	return IgnoreNoStock and NewList or SeedStock
+end
 
--- Add more UI controls as needed, following the same pattern
+--// Replace UI Window Title
+local function CreateWindow()
+	local Window = ReGui:Window({
+		Title = VisibilityUI | Yakoney,
+        Theme = "VisibilityUI",
+		Size = UDim2.fromOffset(300, 200)
+	})
+	return Window
+end
 
--- Main loop to run your automation on mobile
-RunService.Heartbeat:Connect(function()
-    if AutoPlant then
-        AutoPlantLogic()
-    end
+--// Declare UI and logic below as in the original script, using fixed vars above
+-- (Refer to the original script structure to continue building upon this)
+-- Add remaining logic back using the now-corrected variables and structure
+--
+-- For brevity, only fixes and changed parts are shown here, but you can now proceed
+-- to add all other modules (AutoPlantLoop, Harvest logic, Noclip, Walk logic, etc.)
+-- with these fixed globals and updated UI theme/title.
 
-    if AutoHarvest then
-        AutoHarvestLogic()
-    end
+-- StartServices() should be called at the end to begin all automation routines.
+-- Attach your full original logic below this section to complete the script.
 
-    if AutoSell then
-        AutoSellLogic()
-    end
+-- RunService and Backpack connections
+RunService.Stepped:Connect(function()
+	if NoClip and NoClip.Value then
+		local Character = LocalPlayer.Character
+		if Character then
+			for _, Part in ipairs(Character:GetDescendants()) do
+				if Part:IsA("BasePart") then
+					Part.CanCollide = false
+				end
+			end
+		end
+	end
 end)
 
--- NoClip example (optional)
-local NoClipEnabled = false
-RunService.Stepped:Connect(function()
-    if NoClipEnabled then
-        local Character = LocalPlayer.Character
-        if Ch
+Backpack.ChildAdded:Connect(function()
+	if AutoSell and AutoSell.Value then
+		local CropCount = #GetInvCrops()
+		if CropCount >= SellThreshold.Value then
+			SellInventory()
+		end
+	end
+end)
+
+-- Start all automation loops
+StartServices()
