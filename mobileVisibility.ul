@@ -1,0 +1,135 @@
+--[[ 
+    @author Yakoney
+    @description Grow a Garden auto-farm script (Mobile Friendly)
+    @ui VisibilityUI by Yakoney
+    https://www.roblox.com/games/126884695634066
+]]
+
+--// Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local InsertService = game:GetService("InsertService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Leaderstats = LocalPlayer:WaitForChild("leaderstats")
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local ShecklesCount = Leaderstats:WaitForChild("Sheckles")
+
+-- UI Library: ReGui with Prefabs
+local ReGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/depthso/Dear-ReGui/refs/heads/main/ReGui.lua'))()
+local PrefabsId = "rbxassetid://" .. ReGui.PrefabsId
+
+-- Colors for UI Theme
+local Accent = {
+    DarkGreen = Color3.fromRGB(45, 95, 25),
+    Green = Color3.fromRGB(69, 142, 40),
+    Brown = Color3.fromRGB(26, 20, 8),
+}
+
+-- Initialize ReGui with Prefabs
+ReGui:Init({
+    Prefabs = InsertService:LoadLocalAsset(PrefabsId)
+})
+
+-- Define Mobile-Friendly Theme
+ReGui:DefineTheme("MobileUI", {
+    WindowBg = Accent.Brown,
+    TitleBarBg = Accent.DarkGreen,
+    TitleBarBgActive = Accent.Green,
+    ResizeGrab = Accent.DarkGreen,
+    FrameBg = Accent.DarkGreen,
+    FrameBgActive = Accent.Green,
+    CollapsingHeaderBg = Accent.Green,
+    ButtonsBg = Accent.Green,
+    CheckMark = Accent.Green,
+    SliderGrab = Accent.Green,
+})
+
+-- Globals for toggles
+local AutoPlant = false
+local AutoHarvest = false
+local AutoSell = false
+
+-- Placeholder for your farming logic functions
+local function AutoPlantLogic()
+    -- Your original AutoPlant logic goes here
+end
+
+local function AutoHarvestLogic()
+    -- Your original AutoHarvest logic goes here
+end
+
+local function AutoSellLogic()
+    -- Your original AutoSell logic goes here
+end
+
+-- Create the mobile-friendly UI window
+local function CreateMobileWindow()
+    local Window = ReGui:Window({
+        Title = "VisibilityUI by Yakoney",
+        Theme = "MobileUI",
+        Size = UDim2.new(0.9, 0, 0.7, 0), -- 90% width, 70% height of screen
+        Position = UDim2.new(0.05, 0, 0.15, 0), -- centered with margin
+        Resizable = false,
+        Movable = true,
+    })
+    return Window
+end
+
+local Window = CreateMobileWindow()
+
+-- Add toggle buttons with large touch-friendly size
+local AutoPlantToggle = Window:Toggle({
+    Text = "Auto Plant",
+    Default = false,
+    Callback = function(state)
+        AutoPlant = state
+    end,
+    Size = UDim2.new(1, 0, 0, 50), -- full width, 50px height
+})
+
+local AutoHarvestToggle = Window:Toggle({
+    Text = "Auto Harvest",
+    Default = false,
+    Callback = function(state)
+        AutoHarvest = state
+    end,
+    Size = UDim2.new(1, 0, 0, 50),
+})
+
+local AutoSellToggle = Window:Toggle({
+    Text = "Auto Sell",
+    Default = false,
+    Callback = function(state)
+        AutoSell = state
+    end,
+    Size = UDim2.new(1, 0, 0, 50),
+})
+
+-- Add more UI controls as needed, following the same pattern
+
+-- Main loop to run your automation on mobile
+RunService.Heartbeat:Connect(function()
+    if AutoPlant then
+        AutoPlantLogic()
+    end
+
+    if AutoHarvest then
+        AutoHarvestLogic()
+    end
+
+    if AutoSell then
+        AutoSellLogic()
+    end
+end)
+
+-- NoClip example (optional)
+local NoClipEnabled = false
+RunService.Stepped:Connect(function()
+    if NoClipEnabled then
+        local Character = LocalPlayer.Character
+        if Ch
